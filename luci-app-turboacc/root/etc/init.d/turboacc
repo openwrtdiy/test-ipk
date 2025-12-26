@@ -1,0 +1,23 @@
+#!/bin/sh /etc/rc.common
+
+START=95
+USE_PROCD=1
+
+start_service() {
+	config_load turboacc
+	config_get_bool sw_flow config sw_flow 0
+	config_get_bool bbr config bbr 0
+
+	# BBR 控制
+	if [ "$bbr" -eq 1 ]; then
+		sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1
+	fi
+
+	# 24.10 原生加速通过调用 uci 修改防火墙来实现，这样最稳定
+	if [ "$sw_flow" -eq 1 ]; then
+		uci set firewall.@defaults[0].flow_offloading='1'
+		uci commit firewall
+		/etc/init.d/firewall reload
+	fi
+}
+
