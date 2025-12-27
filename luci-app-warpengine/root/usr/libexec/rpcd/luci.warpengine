@@ -1,0 +1,14 @@
+#!/bin/sh
+case "$1" in
+	list) echo '{ "get_status": {} }' ;;
+	call)
+		case "$2" in
+			get_status)
+				count=$(nft list flowtable inet fw4 ft 2>/dev/null | grep -c "packets")
+				hw="Inactive"; [ -d "/sys/kernel/debug/ppe" ] && hw="Active"
+				echo "{ \"flow_count\": $count, \"hw_status\": \"$hw\" }"
+			;;
+		esac
+	;;
+esac
+

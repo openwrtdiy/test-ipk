@@ -1,0 +1,13 @@
+{
+	"luci-app-warpengine": {
+		"description": "Grant access to WarpEngine configuration and status",
+		"read": {
+			"uci": [ "warpengine", "firewall", "dhcp", "network" ],
+			"rpc-objects": [ "luci.warpengine" ]
+		},
+		"write": {
+			"uci": [ "warpengine", "firewall", "dhcp" ]
+		}
+	}
+}
+

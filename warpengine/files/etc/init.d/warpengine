@@ -1,0 +1,78 @@
+#!/bin/sh /etc/init.d/procd
+
+START=95
+
+fastest_dns() {
+    local dns_list="119.29.29.29 223.5.5.5 180.76.76.76 114.114.114.114"
+    local best_dns="119.29.29.29"; local min_ms=999
+    for dns in $dns_list; do
+        local ms=$(ping -c 1 -W 1 $dns | grep 'time=' | sed 's/.*time=\([0-9.]*\).*/\1/')
+        if [ -n "$ms" ] && [ "$(echo "$ms < $min_ms" | bc -l)" -eq 1 ]; then
+            min_ms=$ms; best_dns=$dns
+        fi
+    done
+    echo "$best_dns"
+}
+
+start_service() {
+    config_load 'warpengine'
+    local enabled sw_offload hw_offload ipv6_offload mss_clamping game_process bbr dns_acc dns_mode
+    
+    config_get_bool enabled 'config' 'enabled' 0
+    [ "$enabled" -eq 1 ] || return 0
+
+    # 1. Flow Offloading (Dual Stack)
+    config_get_bool sw_offload 'config' 'sw_flow_offload' 0
+    config_get_bool hw_offload 'config' 'hw_flow_offload' 0
+    config_get_bool ipv6_offload 'config' 'ipv6_offload' 0
+    uci set firewall.@defaults.flow_offloading="$sw_offload"
+    uci set firewall.@defaults.hw_flow_offloading="$hw_offload"
+    uci set firewall.@defaults.flow_offloading_6="$ipv6_offload"
+
+    # 2. MSS & FullCone
+    config_get_bool mss_clamping 'config' 'mss_clamping' 0
+    uci set firewall.@defaults.tcp_mss_clamping="$mss_clamping"
+    config_get_bool fullcone 'config' 'fullcone_nat' 0
+    uci set firewall.@defaults.fullcone="$fullcone"
+    uci commit firewall
+    /etc/init.d/firewall reload
+
+    # 3. BBR
+    config_get_bool bbr 'config' 'bbr' 0
+    if [ "$bbr" -eq 1 ]; then
+        sysctl -w net.core.default_qdisc=fq >/dev/null 2>&1
+        sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1
+    fi
+
+    # 4. Game Optimization (CAKE)
+    config_get_bool game_process 'config' 'game_process' 0
+    [ "$game_process" -eq 1 ] && tc qdisc add dev br-lan root cake 2>/dev/null
+
+    # 5. DNS Acceleration
+    config_get_bool dns_acc 'config' 'dns_acc' 0
+    if [ "$dns_acc" -eq 1 ]; then
+        config_get dns_mode 'config' 'dns_mode' 'static'
+        local target_dns
+        [ "$dns_mode" = "auto" ] && target_dns=$(fastest_dns) || config_get target_dns 'config' 'dns_server' '119.29.29.29'
+        uci -q del_list dhcp.@dnsmasq.server
+        uci add_list dhcp.@dnsmasq.server="$target_dns"
+        uci set dhcp.@dnsmasq.noresolv='1'
+        uci commit dhcp
+        /etc/init.d/dnsmasq restart
+    fi
+}
+
+stop_service() {
+    uci set firewall.@defaults.flow_offloading='0'
+    uci set firewall.@defaults.hw_flow_offloading='0'
+    uci set firewall.@defaults.flow_offloading_6='0'
+    uci set firewall.@defaults.fullcone='0'
+    uci commit firewall
+    /etc/init.d/firewall reload
+    tc qdisc del dev br-lan root 2>/dev/null
+    uci set dhcp.@dnsmasq.noresolv='0'
+    uci -q del_list dhcp.@dnsmasq.server
+    uci commit dhcp
+    /etc/init.d/dnsmasq restart
+}
+
