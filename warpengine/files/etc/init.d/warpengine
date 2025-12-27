@@ -1,14 +1,27 @@
-#!/bin/sh /etc/init.d/procd
+#!/bin/sh /etc/rc.common
 
 START=95
 
 fastest_dns() {
     local dns_list="119.29.29.29 223.5.5.5 180.76.76.76 114.114.114.114"
-    local best_dns="119.29.29.29"; local min_ms=999
+    local best_dns="119.29.29.29"
+    local min_ms="999"
+
     for dns in $dns_list; do
-        local ms=$(ping -c 1 -W 1 $dns | grep 'time=' | sed 's/.*time=\([0-9.]*\).*/\1/')
-        if [ -n "$ms" ] && [ "$(echo "$ms < $min_ms" | bc -l)" -eq 1 ]; then
-            min_ms=$ms; best_dns=$dns
+        local line=$(ping -c 1 -W 1 "$dns" 2>/dev/null | grep 'time=')
+        if [ -n "$line" ]; then
+            # Extract time value (e.g., "time=12.3 ms")
+            local ms_raw=$(echo "$line" | sed 's/.*time=\([0-9.]*\).*/\1/')
+            if [ -n "$ms_raw" ]; then
+                # Compare as integers by truncating decimal part
+                local ms_int=${ms_raw%%.*}
+                local min_ms_int=${min_ms%%.*}
+                if [ -z "$ms_int" ]; then ms_int=999; fi
+                if [ "$ms_int" -lt "$min_ms_int" ]; then
+                    min_ms="$ms_raw"
+                    best_dns="$dns"
+                fi
+            fi
         fi
     done
     echo "$best_dns"
@@ -16,63 +29,78 @@ fastest_dns() {
 
 start_service() {
     config_load 'warpengine'
-    local enabled sw_offload hw_offload ipv6_offload mss_clamping game_process bbr dns_acc dns_mode
-    
-    config_get_bool enabled 'config' 'enabled' 0
+    local enabled sw_offload hw_offload ipv6_offload mss_clamping game_process bbr fullcone dns_acc dns_mode dns_server
+
+    config_get_bool enabled main enabled 0
     [ "$enabled" -eq 1 ] || return 0
 
     # 1. Flow Offloading (Dual Stack)
-    config_get_bool sw_offload 'config' 'sw_flow_offload' 0
-    config_get_bool hw_offload 'config' 'hw_flow_offload' 0
-    config_get_bool ipv6_offload 'config' 'ipv6_offload' 0
-    uci set firewall.@defaults.flow_offloading="$sw_offload"
-    uci set firewall.@defaults.hw_flow_offloading="$hw_offload"
-    uci set firewall.@defaults.flow_offloading_6="$ipv6_offload"
+    config_get_bool sw_offload main sw_flow_offload 0
+    config_get_bool hw_offload main hw_flow_offload 0
+    config_get_bool ipv6_offload main ipv6_offload 0
+    uci set firewall.@defaults[0].flow_offloading="$sw_offload"
+    uci set firewall.@defaults[0].hw_flow_offloading="$hw_offload"
+    uci set firewall.@defaults[0].flow_offloading_6="$ipv6_offload"
 
     # 2. MSS & FullCone
-    config_get_bool mss_clamping 'config' 'mss_clamping' 0
-    uci set firewall.@defaults.tcp_mss_clamping="$mss_clamping"
-    config_get_bool fullcone 'config' 'fullcone_nat' 0
-    uci set firewall.@defaults.fullcone="$fullcone"
+    config_get_bool mss_clamping main mss_clamping 0
+    config_get_bool fullcone main fullcone_nat 0
+    uci set firewall.@defaults[0].tcp_mss_clamping="$mss_clamping"
+    uci set firewall.@defaults[0].fullcone="$fullcone"
     uci commit firewall
     /etc/init.d/firewall reload
 
     # 3. BBR
-    config_get_bool bbr 'config' 'bbr' 0
+    config_get_bool bbr main bbr 0
     if [ "$bbr" -eq 1 ]; then
         sysctl -w net.core.default_qdisc=fq >/dev/null 2>&1
         sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1
     fi
 
-    # 4. Game Optimization (CAKE)
-    config_get_bool game_process 'config' 'game_process' 0
-    [ "$game_process" -eq 1 ] && tc qdisc add dev br-lan root cake 2>/dev/null
+    # 4. Game Optimization (CAKE on br-lan)
+    config_get_bool game_process main game_process 0
+    if [ "$game_process" -eq 1 ]; then
+        tc qdisc del dev br-lan root 2>/dev/null
+        tc qdisc add dev br-lan root cake 2>/dev/null
+    fi
 
     # 5. DNS Acceleration
-    config_get_bool dns_acc 'config' 'dns_acc' 0
+    config_get_bool dns_acc main dns_acc 0
     if [ "$dns_acc" -eq 1 ]; then
-        config_get dns_mode 'config' 'dns_mode' 'static'
+        config_get dns_mode main dns_mode 'static'
         local target_dns
-        [ "$dns_mode" = "auto" ] && target_dns=$(fastest_dns) || config_get target_dns 'config' 'dns_server' '119.29.29.29'
-        uci -q del_list dhcp.@dnsmasq.server
-        uci add_list dhcp.@dnsmasq.server="$target_dns"
-        uci set dhcp.@dnsmasq.noresolv='1'
+        if [ "$dns_mode" = "auto" ]; then
+            target_dns=$(fastest_dns)
+        else
+            config_get target_dns main dns_server '119.29.29.29'
+        fi
+        uci -q del_list dhcp.@dnsmasq[0].server
+        uci add_list dhcp.@dnsmasq[0].server="$target_dns"
+        uci set dhcp.@dnsmasq[0].noresolv='1'
         uci commit dhcp
         /etc/init.d/dnsmasq restart
     fi
 }
 
 stop_service() {
-    uci set firewall.@defaults.flow_offloading='0'
-    uci set firewall.@defaults.hw_flow_offloading='0'
-    uci set firewall.@defaults.flow_offloading_6='0'
-    uci set firewall.@defaults.fullcone='0'
+    # Reset firewall settings
+    uci set firewall.@defaults[0].flow_offloading='0'
+    uci set firewall.@defaults[0].hw_flow_offloading='0'
+    uci set firewall.@defaults[0].flow_offloading_6='0'
+    uci set firewall.@defaults[0].tcp_mss_clamping='disable'
+    uci set firewall.@defaults[0].fullcone='0'
     uci commit firewall
     /etc/init.d/firewall reload
+
+    # Remove CAKE
     tc qdisc del dev br-lan root 2>/dev/null
-    uci set dhcp.@dnsmasq.noresolv='0'
-    uci -q del_list dhcp.@dnsmasq.server
+
+    # Restore DNS
+    uci set dhcp.@dnsmasq[0].noresolv='0'
+    uci -q del_list dhcp.@dnsmasq[0].server
     uci commit dhcp
     /etc/init.d/dnsmasq restart
-}
 
+    # Optional: restore default congestion control (cubic is typical default)
+    sysctl -w net.ipv4.tcp_congestion_control=cubic >/dev/null 2>&1
+}

@@ -3,9 +3,8 @@
 		"title": "WarpEngine",
 		"action": {
 			"type": "view",
-			"path": "warpengine"
+			"path": "warpengine/warpengine"
 		},
 		"order": 10
 	}
 }
-

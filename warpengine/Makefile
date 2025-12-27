@@ -1,8 +1,8 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=warpengine
-PKG_VERSION:=2025.12.27
-PKG_RELEASE:=1
+PKG_VERSION:=2025.12.28
+PKG_RELEASE:=2
 
 include $(INCLUDE_DIR)/package.mk
 
@@ -24,4 +24,3 @@ define Package/warpengine/install
 endef
 
 $(eval $(call BuildPackage,warpengine))
-

@@ -1,53 +1,103 @@
-# 🌌 WarpEngine (Ultra Edition)
+# 🌌 WarpEngine (Ultra Edition)  
 > **专为 nftables/fw4 架构打造的 OpenWrt 全栈网络高速转发引擎**
 
-`WarpEngine` 是专为 **OpenWrt 24.10** (`firewall4` / `nftables`) 深度定制的网络加速方案。它通过重构流量转发路径，整合底层硬件分载 (PPE)、全栈流量优化及智能调度算法，为现代高速光纤网络提供近乎零损耗的转发体验。
+`WarpEngine` 是专为 **OpenWrt 24.10+**（基于 `firewall4` / `nftables`）深度定制的网络加速方案。通过重构流量转发路径，整合底层硬件分载（PPE）、全栈流量优化与智能调度算法，为现代千兆/万兆光纤网络提供近乎零损耗的转发体验。
 
 ---
 
-## ✨ 核心特性 (2025 旗舰版)
+## ✨ 核心特性（2025 旗舰版）
 
-*   **⚡ 双栈硬件分载 (HW Flow Offload)**：支持 IPv4/IPv6 流量直接通过硬件（如 MediaTek PPE、Rockchip 等）转发，极大地降低千兆环境下的 CPU 占用。
-*   **🎮 游戏战斗模式 (CAKE QoS)**：集成内核级 `CAKE` 队列管理算法，优化小包转发优先级，显著抑制多设备并发导致的游戏延迟抖动。
-*   **🌐 IPv6 全栈加速**：完美适配 OpenWrt 24.10 的 IPv6 流量分载，实现真正的全互联网协议加速。
-*   **🛠️ MSS 自动钳制**：智能修复 PPPoE 拨号环境下的 MTU 路径不通问题，告别网页加载缓慢或图片打不开的烦恼。
-*   **🎯 智能 DNS 导航**：内置 2025 年主流公共 DNS 自动测速逻辑，秒级选取延迟最低的上游解析器。
-*   **🛡️ 加速排除名单**：支持内网 IP 豁免，确保本地 NAS、VPN 或私有加密协议不因分载而出现断流或异常。
-*   **📈 实时状态监控**：通过 JavaScript 异步 RPC 接口，实时反馈内核 `nftables` 加速表活跃连接数及硬件 PPE 激活状态。
-
----
-
-🚀 运行状态说明
-在 WarpEngine 控制面板中，您可以实时监测引擎的运行效率：
-活跃加速连接数 (Active Flows)：
-该数值通过 nftables 实时反馈。
-数值 > 0：表示当前网络流量已成功进入“曲速路径”，跳过 CPU 协议栈进行高速转发。
-数值 = 0：可能当前无大流量活动，或流量已被排除名单拦截。
-硬件 PPE 状态 (Hardware Status)：
-Active: 表示设备硬件加速模块（如 MTK PPE）已成功接管流量，此时 CPU 负载最低。
-Inactive / Disabled: 表示当前通过软件分载加速，或硬件驱动暂不支持。
-TCP 拥塞算法状态：
-显示当前系统生效的 TCP 算法（如 bbr），实时验证 BBR 加速是否下发成功。
+- **⚡ 双栈硬件分载（HW Flow Offload）**  
+  支持 IPv4/IPv6 流量直通硬件（如 MediaTek PPE、Rockchip 等），显著降低 CPU 占用。
+- **🎮 游戏战斗模式（CAKE QoS）**  
+  集成内核级 `CAKE` 队列管理算法，优先处理小包流量，抑制游戏延迟抖动。
+- **🌐 IPv6 全栈加速**  
+  完美适配 OpenWrt 24.10 的 IPv6 分载机制，实现双栈无差别高速转发。
+- **🛠️ MSS 自动钳制**  
+  智能修复 PPPoE 场景 MTU 问题，解决网页加载慢、图片打不开等故障。
+- **🎯 智能 DNS 导航**  
+  自动测速并切换至最低延迟公共 DNS（如 1.1.1.1、8.8.8.8、223.5.5.5）。
+- **🛡️ 加速排除名单**  
+  按 IP 豁免关键设备（NAS、VPN 等），避免分载导致异常。
+- **📈 实时状态监控**  
+  WebUI 实时展示活跃流、PPE 状态与 TCP 拥塞算法。
 
 ---
 
-## ⚠️ 注意事项 (必读)
+## 🚀 运行状态说明
 
-1.  **系统版本要求**：
-    *   本插件仅适用于 **OpenWrt 24.10 或更高版本**。
-    *   严禁在旧版 OpenWrt (19.07/21.02) 或非 `fw4` (nftables) 架构的固件上安装。
-2.  **Firewall 管理规范**：
-    *   2025 年后的固件已全面转向 `nftables`。请勿手动通过命令行插入旧式的 `iptables` 规则，否则会导致 `WarpEngine` 的加速逻辑失效。
-3.  **内核模块依赖**：
-    *   开启 **FullCone NAT** 必须确保你的系统内核已包含 `kmod-nft-fullcone` 补丁。
-    *   开启 **硬件加速** 需要设备硬件驱动层面支持（推荐 MT7981/MT7986/MT7621 等系列）。
+在控制面板中监控：
+- **Active Flows > 0**：流量已进入“曲速路径”。
+- **PPE Status = Active**：硬件加速生效，CPU 负载最低。
+- **TCP Algorithm = bbr**：BBR 拥塞控制已启用。
+
+---
+
+## ⚠️ 注意事项（必读）
+
+1. **仅支持 OpenWrt 24.10+**（`fw4`/`nftables` 架构）。
+2. **禁止使用 `iptables` 手动规则**，会破坏加速逻辑。
+3. **FullCone NAT** 需 `kmod-nft-fullcone`；**硬件加速**需 SoC 支持（如 MT798x/MT7621）。
 
 ---
 
 ## 🚫 已知冲突与解决方案
 
-冲突项	冲突表现	建议操作
-SQM QoS / 流量限速	开启硬件加速后，流量绕过协议栈，导致限速规则失效。	若需精准限速，请关闭“硬件加速”，仅开启“软件加速”。
-应用过滤 (oaf)	部分应用特征包可能被加速引擎绕过，导致过滤不全。	将需要管控的设备 IP 加入“加速排除名单”。
-第三方代理插件	例如PassWall 或 SSRPlus插件自带分载逻辑，可能与 WarpEngine 产生配置竞争。	建议在代理插件中关闭其自带加速开关，由 WarpEngine 统一管理。
-多线负载 (mwan3)	默认分载优先级可能导致多线出口策略不平衡。	开启插件内的“多线多播兼容模式”以优化 nftables 优先级。
+| 冲突项 | 问题 | 解决方案 |
+|-------|------|--------|
+| SQM QoS | 限速失效 | 关闭硬件加速，仅用软件分载 |
+| 应用过滤 (OAF) | 过滤不全 | 将目标 IP 加入排除名单 |
+| PassWall / SSRPlus | 规则冲突 | 在代理插件中禁用其“Shortcut-FE”或“分载”功能 |
+| mwan3 多线负载 | 出口策略失衡 | 启用“多线兼容模式”或调整 nftables 优先级 |
+
+---
+
+## 📊 监控与调试技巧
+
+### 查看活跃加速流
+nft list chain inet fw4 warpengine_flows
+或通过 WebUI 实时面板观察 “Active Flows” 计数。
+
+### 确认 PPE 是否激活
+dmesg | grep -i ppe
+# 或（若驱动支持）
+cat /proc/ppe/enable
+
+### 验证 TCP BBR 是否生效
+sysctl net.ipv4.tcp_congestion_control
+# 应返回 bbr 或 bbr2
+
+### 测试 MSS 钳制效果
+ping -M do -s 1472 8.8.8.8
+# 在 PPPoE 环境下通常需 ≤1452 才能成功
+
+## 🔮 未来展望（2026 预研方向）
+eBPF 深度集成：利用 eBPF 实现更灵活的流量调度与可观测性。
+Wi-Fi 7 协同加速：结合 TWT 与 MLO，实现有线-无线统一低延迟调度。
+AI 驱动的 QoS：基于实时应用识别动态调整 CAKE 参数。
+
+## 开发环境要求
+OpenWrt SDK 24.10+
+支持 nftables 的测试设备（如 MT7981 开发板）
+
+## 📥 安装说明
+1. 添加软件源
+将本仓库地址加入你的 feeds.conf.default，然后更新并安装：
+./scripts/feeds update -a && ./scripts/feeds install -a
+
+2. 编译勾选
+在 make menuconfig 中按路径寻找：
+Network -> warpengine (核心引擎)
+LuCI -> 3. Applications -> luci-app-warpengine (控制界面)
+
+3. 手动安装 (.ipk)
+若使用现成的安装包，请按以下顺序安装：
+opkg update
+opkg install kmod-nft-offload kmod-nft-fullcone kmod-tcp-bbr tc-tiny kmod-sched-cake
+opkg install warpengine_*.ipk
+opkg install luci-app-warpengine_*.ipk
+
+## 📈 状态监测
+在 LuCI 界面中，您可以实时查看到 “当前加速连接数”：
+连接数 > 0：说明加速引擎正在正常转发流量。
+硬件 PPE 状态为 Active：说明流量已成功移交给硬件芯片，CPU 正处于空闲状态。
