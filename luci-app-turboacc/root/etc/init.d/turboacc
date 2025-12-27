@@ -6,18 +6,52 @@ USE_PROCD=1
 start_service() {
 	config_load turboacc
 	config_get_bool sw_flow config sw_flow 0
+	config_get_bool hw_flow config hw_flow 0
 	config_get_bool bbr config bbr 0
+	config_get_bool fullcone config fullcone 0
 
-	# BBR 控制
+	# 设置 BBR
 	if [ "$bbr" -eq 1 ]; then
 		sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1
+		sysctl -w net.ipv4.tcp_bbr_cca=1 >/dev/null 2>&1
+	else
+		sysctl -w net.ipv4.tcp_congestion_control=cubic >/dev/null 2>&1
 	fi
 
-	# 24.10 原生加速通过调用 uci 修改防火墙来实现，这样最稳定
+	# 流量分流配置
 	if [ "$sw_flow" -eq 1 ]; then
 		uci set firewall.@defaults[0].flow_offloading='1'
-		uci commit firewall
-		/etc/init.d/firewall reload
+		uci set firewall.@defaults[0].flow_offloading_hw="$hw_flow"
+	else
+		uci set firewall.@defaults[0].flow_offloading='0'
+		uci set firewall.@defaults[0].flow_offloading_hw='0'
 	fi
+
+	# FullCone NAT
+	if [ "$fullcone" -eq 1 ]; then
+		uci set firewall.@defaults[0].fullcone='1'
+	else
+		uci set firewall.@defaults[0].fullcone='0'
+	fi
+
+	# 提交并重载防火墙
+	uci commit firewall
+	/etc/init.d/firewall reload >/dev/null 2>&1
+
+	logger -t "turboacc" "TurboACC started: BBR=$bbr, SW=$sw_flow, HW=$hw_flow, FullCone=$fullcone"
 }
 
+stop_service() {
+	uci set firewall.@defaults[0].flow_offloading='0'
+	uci set firewall.@defaults[0].flow_offloading_hw='0'
+	uci set firewall.@defaults[0].fullcone='0'
+	sysctl -w net.ipv4.tcp_congestion_control=cubic >/dev/null 2>&1
+	uci commit firewall
+	/etc/init.d/firewall reload >/dev/null 2>&1
+	logger -t "turboacc" "TurboACC stopped, config restored."
+}
+
+restart_service() {
+	stop_service
+	start_service
+}

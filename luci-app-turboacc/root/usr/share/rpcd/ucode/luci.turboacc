@@ -1,35 +1,73 @@
 'use strict';
 
-// 引入 fs 模块用于读取文件和检测路径
 const fs = require('fs');
-// 引入并连接 ubus
-const ubus = require('ubus').connect();
+const ubus = (function() {
+    try {
+        return require('ubus').connect();
+    } catch (e) {
+        return { call: function() { return {}; } };
+    }
+})();
+
+function get_status() {
+    let kernel_ver = "未知";
+    try {
+        let board_info = ubus.call('system', 'board');
+        if (board_info && board_info.kernel) {
+            kernel_ver = board_info.kernel;
+        }
+    } catch (e1) {
+        try {
+            let proc_ver = fs.readfile('/proc/version') || "";
+            let ver_match = proc_ver.match(/Linux version (\d+\.\d+\.\d+)/);
+            if (ver_match && ver_match[1]) {
+                kernel_ver = ver_match[1];
+            }
+        } catch (e2) {}
+    }
+
+    let sw_flow = false;
+    try {
+        let fw_status = ubus.call('firewall', 'status');
+        if (fw_status && fw_status.offloading && fw_status.offloading.enabled === true) {
+            sw_flow = true;
+        }
+    } catch (e1) {
+        try {
+            let cfg = fs.readfile('/etc/config/firewall') || "";
+            sw_flow = cfg.includes('flow_offloading=\'1\'') || cfg.includes('flow_offloading=1');
+        } catch (e2) {
+            try {
+                fs.access('/sys/module/nft_flow_offload');
+                sw_flow = true;
+            } catch (e3) {}
+        }
+    }
+
+    let bbr = false;
+    try {
+        let cc = (fs.readfile('/proc/sys/net/ipv4/tcp_congestion_control') || "").trim();
+        bbr = (cc === "bbr") || (cc === "tcp_bbr");
+    } catch (e) {}
+
+    let fullcone = false;
+    try {
+        fs.access('/sys/module/nft_fullcone');
+        fullcone = true;
+    } catch (e) {}
+
+    return {
+        sw_flow: sw_flow,
+        bbr: bbr,
+        fullcone: fullcone,
+        kernel: kernel_ver
+    };
+}
 
 return {
-	'luci.turboacc': {
-		get_status: {
-			call: function() {
-				// 获取内核版本信息
-				let board_info = ubus.call('system', 'board');
-				let kernel_ver = board_info ? board_info.kernel : "";
-				
-				// 模块检测：access 返回 null 表示不存在，返回对象表示存在
-				let has_nft_offload = fs.access('/sys/module/nft_flow_offload') ? true : false;
-				let has_fullcone = fs.access('/sys/module/nft_fullcone') ? true : false;
-
-				// BBR 检测：读取配置并判断是否包含 bbr
-				let bbr_list = fs.readfile('/proc/sys/net/ipv4/tcp_available_congestion_control') || "";
-				// 在 ucode 中使用 indexOf 检测子串
-				let has_bbr = (index(bbr_list, 'bbr') >= 0);
-
-				return {
-					sw_flow: has_nft_offload,
-					bbr: has_bbr,
-					fullcone: has_fullcone,
-					kernel: kernel_ver
-				};
-			}
-		}
-	}
+    'luci.turboacc': {
+        get_status: {
+            call: get_status
+        }
+    }
 };
-

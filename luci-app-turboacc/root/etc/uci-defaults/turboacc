@@ -1,14 +1,13 @@
 #!/bin/sh
-# 适配 24.10 的初始化逻辑
 [ -f "/etc/config/turboacc" ] && exit 0
 
 touch /etc/config/turboacc
-uci -q batch <<EOF
+uci batch <<EOF
 	set turboacc.config=turboacc
 	set turboacc.config.sw_flow='1'
+	set turboacc.config.hw_flow='0'
 	set turboacc.config.bbr='1'
 	set turboacc.config.fullcone='1'
 	commit turboacc
 EOF
 exit 0
-

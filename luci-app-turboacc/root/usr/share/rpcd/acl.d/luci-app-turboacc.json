@@ -1,15 +1,20 @@
 {
-	"luci-app-turboacc": {
-		"description": "Grant access to TurboACC configuration",
-		"read": {
-			"ubus": {
-				"luci.turboacc": [ "get_status" ]
-			},
-			"uci": [ "turboacc" ]
-		},
-		"write": {
-			"uci": [ "turboacc" ]
-		}
-	}
+  "luci-app-turboacc": {
+    "description": "Grant access to TurboACC configuration",
+    "read": {
+      "ubus": {
+        "luci.turboacc": [
+          "get_status"
+        ]
+      },
+      "uci": [
+        "turboacc"
+      ]
+    },
+    "write": {
+      "uci": [
+        "turboacc"
+      ]
+    }
+  }
 }
-

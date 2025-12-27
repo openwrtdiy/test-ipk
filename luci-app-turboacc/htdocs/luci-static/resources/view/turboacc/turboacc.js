@@ -5,7 +5,6 @@
 'require rpc';
 'require form';
 
-/* 定义后端 ucode 接口调用 */
 var callTurboaccStatus = rpc.declare({
 	object: 'luci.turboacc',
 	method: 'get_status',
@@ -19,7 +18,7 @@ return view.extend({
 		m = new form.Map('turboacc', _('Turbo ACC 网络加速'),
 			_('Turbo ACC 结合了 Linux 内核原生的流量分流 (Flow Offloading) 和 BBR 拥塞控制技术，提升网络转发效率。'));
 
-		/* 状态显示区域 */
+		// 实时状态显示
 		s = m.section(form.TypedSection, '_status');
 		s.anonymous = true;
 		s.render = function() {
@@ -43,27 +42,24 @@ return view.extend({
 			}, this));
 		};
 
-		/* 配置设置区域 */
+		// 配置表单
 		s = m.section(form.NamedSection, 'config', 'turboacc', _('基本设置'));
 		s.addremove = false;
 
-		// 1. 软件分流
 		o = s.option(form.Flag, 'sw_flow', _('开启软件流量分流'),
 			_('通过 nftables flow offload 技术，减少 CPU 转发消耗。'));
 		o.rmempty = false;
 
-		// 2. 硬件分流 (仅在支持的平台上显示)
 		o = s.option(form.Flag, 'hw_flow', _('开启硬件流量分流'),
 			_('需要硬件芯片支持（如 MTK PPE），直接由硬件处理数据包。'));
 		o.depends('sw_flow', '1');
+		o.default = o.disabled;
 		o.rmempty = false;
 
-		// 3. BBR 算法
 		o = s.option(form.Flag, 'bbr', _('开启 BBR 拥塞控制'),
 			_('Google 开发的 TCP 拥塞控制算法，优化高延迟网络速度。'));
 		o.rmempty = false;
 
-		// 4. FullCone NAT
 		o = s.option(form.Flag, 'fullcone', _('开启全锥形 NAT'),
 			_('提升 P2P 和网络游戏连接成功率。'));
 		o.rmempty = false;
@@ -71,4 +67,3 @@ return view.extend({
 		return m.render();
 	}
 });
-

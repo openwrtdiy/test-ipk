@@ -1,7 +1,9 @@
 {
-	"turboacc": {
-		"init": "turboacc",
-		"affects": [ "network", "firewall" ]
-	}
+  "turboacc": {
+    "init": "turboacc",
+    "affects": [
+      "network",
+      "firewall"
+    ]
+  }
 }
-
