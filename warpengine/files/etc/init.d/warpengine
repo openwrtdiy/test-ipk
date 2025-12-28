@@ -1,118 +1,154 @@
 #!/bin/sh /etc/rc.common
-
 START=95
 USE_PROCD=1
-
-# DNS 优选算法
+# DNS 优选算法 (保持原样)
 fastest_dns() {
-    local dns_list="119.29.29.29 223.5.5.5 180.76.76.76 114.114.114.114"
-    local best_dns="119.29.29.29"
-    local min_int="9999999"
-    for dns in $dns_list; do
-        local line=$(ping -c 1 -W 1 "$dns" 2>/dev/null | grep 'time=')
-        if [ -n "$line" ]; then
-            local ms_int=$(echo "$line" | sed 's/.*time=\([0-9.]*\).*/\1/' | tr -d '.')
-            if [ "$ms_int" -lt "$min_int" ]; then min_int="$ms_int"; best_dns="$dns"; fi
-        fi
-    done
-    echo "$best_dns"
+ local dns_list="119.29.29.29 223.5.5.5 180.76.76.76 114.114.114.114"
+ local best_dns="119.29.29.29"
+ local min_int="9999999"
+ for dns in $dns_list; do
+ local line=$(ping -c 1 -W 1 "$dns" 2>/dev/null | grep 'time=')
+ if [ -n "$line" ]; then
+ local ms_int=$(echo "$line" | sed 's/.*time=\([0-9.]*\).*/\1/' | tr -d '.')
+ if [ "$ms_int" -lt "$min_int" ]; then min_int="$ms_int"; best_dns="$dns"; fi
+ fi
+ done
+ echo "$best_dns"
 }
-
 start_service() {
-    config_load 'warpengine'
-    local master
-    config_get_bool master main enabled 0
-
-    if [ "$master" -eq 0 ]; then
-        logger -t "WarpEngine" "总控开关已关闭，还原每个节点出厂值..."
-        stop_service
-        return 0
-    fi
-
-    logger -t "WarpEngine" "总控开关已启用，开始检查各功能节点状态..."
-
-    # 1. 软件/硬件/IPv6 加速/MSS/FullCone (防火墙组)
-    local sw hw v6 mss fc
-    config_get_bool sw main sw_flow_offload 0
-    config_get_bool hw main hw_flow_offload 0
-    config_get_bool v6 main ipv6_offload 0
-    config_get_bool mss main mss_clamping 1
-    config_get_bool fc main fullcone_nat 0
-
-    uci set firewall.@defaults[-1].flow_offloading="$sw"
-    uci set firewall.@defaults[-1].hw_flow_offloading="$hw"
-    uci set firewall.@defaults[-1].flow_offloading_6="$v6"
-    uci set firewall.@defaults[-1].tcp_mss_clamping="$mss"
-    uci set firewall.@defaults[-1].fullcone="$fc"
-    uci commit firewall
-    /etc/init.d/firewall reload
-    
-    [ "$sw" -eq 1 ] && logger -t "WarpEngine" "软件加速：已启用" || logger -t "WarpEngine" "软件加速：已禁用 (还原出厂)"
-    [ "$hw" -eq 1 ] && logger -t "WarpEngine" "硬件加速：已启用" || logger -t "WarpEngine" "硬件加速：已禁用 (还原出厂)"
-    [ "$v6" -eq 1 ] && logger -t "WarpEngine" "全栈加速：已启用" || logger -t "WarpEngine" "全栈加速：已禁用 (还原出厂)"
-    [ "$fc" -eq 1 ] && logger -t "WarpEngine" "FullCone NAT：已启用" || logger -t "WarpEngine" "FullCone NAT：已禁用 (还原出厂)"
-
-    # 2. TCP BBR
-    local bbr
-    config_get_bool bbr main bbr 0
-    if [ "$bbr" -eq 1 ]; then
-        sysctl -w net.core.default_qdisc=fq >/dev/null 2>&1
-        sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1
-        logger -t "WarpEngine" "TCP BBR 算法：已启用"
-    else
-        sysctl -w net.ipv4.tcp_congestion_control=cubic >/dev/null 2>&1
-        sysctl -w net.core.default_qdisc=fq_codel >/dev/null 2>&1
-        logger -t "WarpEngine" "TCP BBR 算法：已禁用 (还原出厂)"
-    fi
-
-    # 3. CAKE
-    local cake
-    config_get_bool cake main game_process 0
-    local lan_if=$(uci -q get network.lan.device || echo "br-lan")
-    tc qdisc del dev "$lan_if" root 2>/dev/null
-    if [ "$cake" -eq 1 ]; then
-        tc qdisc add dev "$lan_if" root cake 2>/dev/null
-        logger -t "WarpEngine" "游戏转发 (CAKE)：已启用"
-    else
-        logger -t "WarpEngine" "游戏转发 (CAKE)：已禁用 (还原出厂)"
-    fi
-
-    # 4. DNS
-    local dns_acc
-    config_get_bool dns_acc main dns_acc 0
-    if [ "$dns_acc" -eq 1 ]; then
-        local mode target_dns
-        config_get mode main dns_mode 'static'
-        [ "$mode" = "auto" ] && target_dns=$(fastest_dns) || config_get target_dns main dns_server '119.29.29.29'
-        uci -q del dhcp.@dnsmasq.server
-        uci add_list dhcp.@dnsmasq.server="$target_dns"
-        uci set dhcp.@dnsmasq.noresolv='1'
-        logger -t "WarpEngine" "智能 DNS 加速：已启用 ($target_dns)"
-    else
-        uci set dhcp.@dnsmasq.noresolv='0'
-        uci -q del_list dhcp.@dnsmasq.server
-        logger -t "WarpEngine" "智能 DNS 加速：已禁用 (还原出厂)"
-    fi
-    uci commit dhcp
-    /etc/init.d/dnsmasq restart
+ config_load 'warpengine'
+ local master
+ config_get_bool master main enabled 0
+ if [ "$master" -eq 0 ]; then
+ logger -t "WarpEngine" "总控开关已关闭，还原每个节点出厂值..."
+ stop_service
+ return 0
+ fi
+ logger -t "WarpEngine" "总控开关已启用，开始检查各功能节点状态..."
+ # 1. 防火墙组相关设置: 软件/硬件/IPv6 加速/MSS/FullCone/mwan3兼容
+ local sw hw v6 mss fc mwan3_compat
+ config_get_bool sw main sw_flow_offload 0
+ config_get_bool hw main hw_flow_offload 0
+ config_get_bool v6 main ipv6_offload 0
+ config_get_bool mss main mss_clamping 1
+ config_get_bool fc main fullcone_nat 0
+ config_get_bool mwan3_compat main mwan3_compat 0
+ uci set firewall.@defaults[-1].flow_offloading="$sw"
+ uci set firewall.@defaults[-1].hw_flow_offloading="$hw"
+ uci set firewall.@defaults[-1].flow_offloading_6="$v6"
+ uci set firewall.@defaults[-1].tcp_mss_clamping="$mss"
+ uci set firewall.@defaults[-1].fullcone="$fc"
+ # 2. mwan3 兼容模式动态调整 flowtable 优先级
+ if [ "$mwan3_compat" -eq 1 ]; then
+ # 调整 flowtable 优先级到 1500 以兼容 mwan3
+ nft list table inet fw4 > /dev/null 2>&1
+ if [ "$?" -eq 0 ]; then
+ logger -t "WarpEngine" "mwan3 兼容模式：已启用 (调整 flowtable 优先级)"
+ nft delete flowtable inet fw4 ft 2>/dev/null
+ nft add flowtable inet fw4 ft '{ hook ingress priority 1500; devices = { all }; }'
+ fi
+ else
+ # 还原 flowtable 优先级为默认值
+ nft delete flowtable inet fw4 ft 2>/dev/null
+ nft add flowtable inet fw4 ft '{ hook ingress priority 0; devices = { all }; }'
+ logger -t "WarpEngine" "mwan3 兼容模式：已禁用 (还原出厂)"
+ fi
+ # 3. 加速排除列表
+ uci commit firewall
+ # 触发防火墙重载，这将同时执行 /etc/firewall.user 脚本
+ /etc/init.d/firewall reload
+ # 4. 网络设置: TCP BBR, CAKE, DNS, Packet Steering, IRQ Balance 逻辑
+ local bbr cake dns_acc mode target_dns packet_steering irq_balance
+ config_get_bool bbr main bbr 0
+ config_get_bool cake main game_process 0
+ config_get_bool packet_steering main packet_steering 0
+ config_get_bool irq_balance main irq_balance 0
+ # BBR 逻辑: 启用 Google 的 TCP BBR 拥塞控制算法
+ if [ "$bbr" -eq 1 ]; then
+ sysctl -w net.core.default_qdisc=fq >/dev/null 2>&1
+ sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1
+ logger -t "WarpEngine" "TCP BBR 算法：已启用"
+ else
+ sysctl -w net.ipv4.tcp_congestion_control=cubic >/dev/null 2>&1
+ sysctl -w net.core.default_qdisc=fq_codel >/dev/null 2>&1
+ logger -t "WarpEngine" "TCP BBR 算法：已禁用 (还原出厂)"
+ fi
+ # CAKE 逻辑
+ local lan_if=$(uci -q get network.lan.device || echo "br-lan")
+ tc qdisc del dev "$lan_if" root 2>/dev/null
+ if [ "$cake" -eq 1 ]; then
+ tc qdisc add dev "$lan_if" root cake 2>/dev/null
+ logger -t "WarpEngine" "游戏转发 (CAKE)：已启用"
+ else
+ logger -t "WarpEngine" "游戏转发 (CAKE)：已禁用 (还原出厂)"
+ fi
+ # 新功能实现 1: Packet Steering
+ if [ "$packet_steering" -eq 1 ]; then
+ uci set network.globals.packet_steering='1'
+ logger -t "WarpEngine" "数据包导向 (Packet Steering)：已启用"
+ else
+ uci set network.globals.packet_steering='0'
+ logger -t "WarpEngine" "数据包导向 (Packet Steering)：已禁用"
+ fi
+ uci commit network
+ # 新功能实现 2: IRQ Balance
+ if [ "$irq_balance" -eq 1 ]; then
+ # 检查 irqbalance 是否安装并启用服务
+ if [ -f "/etc/init.d/irqbalance" ]; then
+ /etc/init.d/irqbalance enable
+ /etc/init.d/irqbalance start
+ logger -t "WarpEngine" "IRQ 平衡 (irqbalance)：已启用"
+ else
+ logger -t "WarpEngine" "IRQ 平衡 (irqbalance)：软件包未安装或服务不存在"
+ fi
+ else
+ if [ -f "/etc/init.d/irqbalance" ]; then
+ /etc/init.d/irqbalance disable
+ /etc/init.d/irqbalance stop
+ fi
+ fi
+ # DNS 逻辑: 智能 DNS 加速，优化解析速度
+ config_get_bool dns_acc main dns_acc 0
+ if [ "$dns_acc" -eq 1 ]; then
+ config_get mode main dns_mode 'static'
+ [ "$mode" = "auto" ] && target_dns=$(fastest_dns) || config_get target_dns main dns_server '119.29.29.29'
+ uci -q del dhcp.@dnsmasq.server
+ uci add_list dhcp.@dnsmasq.server="$target_dns"
+ uci set dhcp.@dnsmasq.noresolv='1'
+ logger -t "WarpEngine" "智能 DNS 加速：已启用 ($target_dns)"
+ else
+ uci set dhcp.@dnsmasq.noresolv='0'
+ uci -q del_list dhcp.@dnsmasq.server
+ logger -t "WarpEngine" "智能 DNS 加速：已禁用 (还原出厂)"
+ fi
+ uci commit dhcp
+ /etc/init.d/dnsmasq restart
 }
-
 stop_service() {
-    # 强制所有节点回到出厂值逻辑
-    uci set firewall.@defaults[-1].flow_offloading='0'
-    uci set firewall.@defaults[-1].hw_flow_offloading='0'
-    uci set firewall.@defaults[-1].flow_offloading_6='0'
-    uci set firewall.@defaults[-1].fullcone='0'
-    uci commit firewall && /etc/init.d/firewall reload
-
-    local lan_if=$(uci -q get network.lan.device || echo "br-lan")
-    tc qdisc del dev "$lan_if" root 2>/dev/null
-
-    sysctl -w net.ipv4.tcp_congestion_control=cubic >/dev/null 2>&1
-    sysctl -w net.core.default_qdisc=fq_codel >/dev/null 2>&1
-
-    uci set dhcp.@dnsmasq.noresolv='0'
-    uci -q del_list dhcp.@dnsmasq.server
-    uci commit dhcp && /etc/init.d/dnsmasq restart
+ # 强制所有节点回到出厂值逻辑
+ uci set firewall.@defaults[-1].flow_offloading='0'
+ uci set firewall.@defaults[-1].hw_flow_offloading='0'
+ uci set firewall.@defaults[-1].flow_offloading_6='0'
+ uci set firewall.@defaults[-1].fullcone='0'
+ uci commit firewall
+ # 恢复默认 flowtable 优先级
+ nft delete flowtable inet fw4 ft 2>/dev/null
+ nft add flowtable inet fw4 ft '{ hook ingress priority 0; devices = { all }; }'
+ uci commit firewall && /etc/init.d/firewall reload
+ # 还原 Packet Steering 为默认值 (0)
+ uci set network.globals.packet_steering='0'
+ uci commit network
+ # 停止 IRQ Balance 服务
+ if [ -f "/etc/init.d/irqbalance" ]; then
+ /etc/init.d/irqbalance disable
+ /etc/init.d/irqbalance stop
+ fi
+ local lan_if=$(uci -q get network.lan.device || echo "br-lan")
+ tc qdisc del dev "$lan_if" root 2>/dev/null
+ sysctl -w net.ipv4.tcp_congestion_control=cubic >/dev/null 2>&1
+ sysctl -w net.core.default_qdisc=fq_codel >/dev/null 2>&1
+ uci set dhcp.@dnsmasq.noresolv='0'
+ uci -q del_list dhcp.@dnsmasq.server
+ uci commit dhcp && /etc/init.d/dnsmasq restart
 }
 

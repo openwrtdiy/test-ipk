@@ -1,8 +1,11 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-warpengine
-PKG_VERSION:=2025.12.28
-PKG_RELEASE:=4
+PKG_VERSION:=2025.12.29
+PKG_RELEASE:=5
+
+PKG_LICENSE:=GPL-3.0
+PKG_MAINTAINER:=Your Name <your.email@example.com>
 
 LUCI_TITLE:=LuCI support for WarpEngine (Ultra Edition)
 LUCI_DEPENDS:=+warpengine +luci-base +luci-compat
