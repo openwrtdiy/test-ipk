@@ -1,27 +1,28 @@
 #!/bin/sh
 case "$1" in
-	list)
-		echo '{ "get_status": {} }'
-		;;
-	call)
-		case "$2" in
-			get_status)
-				# Safely get flow count
-				if nft list flowtable inet fw4 ft >/dev/null 2>&1; then
-					count=$(nft list flowtable inet fw4 ft 2>/dev/null | grep -c "packets")
-				else
-					count=0
-				fi
-				count=${count:-0}
+list)
+	echo '{ "get_status": {} }'
+;;
+call)
+	case "$2" in
+	get_status)
+		# Safely get flow count
+		if nft list flowtable inet fw4 ft >/dev/null 2>&1; then
+			count=$(nft list flowtable inet fw4 ft 2>/dev/null | grep -c "packets")
+		else
+			count=0
+		fi
+		count=${count:-0}
 
-				# Check PPE debug interface
-				hw="Inactive"
-				if [ -d "/sys/kernel/debug/ppe" ]; then
-					hw="Active"
-				fi
+		# Check PPE debug interface using safer directory check
+		hw="Inactive"
+		if [ -d "/sys/kernel/debug/ppe" ]; then
+			hw="Active"
+		fi
 
-				printf '{ "flow_count": %d, "hw_status": "%s" }\n' "$count" "$hw"
-				;;
-		esac
-		;;
+		printf '{ "flow_count": %d, "hw_status": "%s" }\n' "$count" "$hw"
+	;;
+	esac
+;;
 esac
+
