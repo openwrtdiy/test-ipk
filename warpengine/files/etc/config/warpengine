@@ -1,5 +1,5 @@
 config main 'config'
-	option enabled '0'
+	option enabled '1'
 	option sw_flow_offload '0'
 	option hw_flow_offload '0'
 	option ipv6_offload '0'

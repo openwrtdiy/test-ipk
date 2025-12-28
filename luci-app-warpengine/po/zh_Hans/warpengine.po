@@ -8,7 +8,7 @@ msgid "Full-stack network acceleration solution designed for OpenWrt 24.10."
 msgstr "专为 OpenWrt 24.10 (nftables/fw4) 设计的全栈网络高速转发方案。"
 
 msgid "Real-time Monitor"
-msgstr "实时监控面板"
+msgstr "实时状态监控"
 
 msgid "Active Flows"
 msgstr "活跃加速连接数"
@@ -16,11 +16,14 @@ msgstr "活跃加速连接数"
 msgid "Hardware PPE Status"
 msgstr "硬件 PPE 状态"
 
-msgid "Active"
-msgstr "运行中 (已激活)"
+msgid "Detected"
+msgstr "已检测到"
 
-msgid "Inactive"
-msgstr "未就绪 (未触发)"
+msgid "Not Detected"
+msgstr "未检测到"
+
+msgid "Active"
+msgstr "运行中"
 
 msgid "Disabled"
 msgstr "已禁用"
@@ -30,6 +33,9 @@ msgstr "核心引擎设置"
 
 msgid "Enable WarpEngine"
 msgstr "启用总开关"
+
+msgid "Firewall Settings"
+msgstr "防火墙设置"
 
 msgid "Software Flow Offloading"
 msgstr "软件加速 (Flow Offloading)"
@@ -66,6 +72,9 @@ msgstr "TCP BBR 拥塞控制"
 
 msgid "Smart DNS Acceleration"
 msgstr "智能 DNS 加速"
+
+msgid "Enable DNS Acceleration"
+msgstr "开启 DNS 加速"
 
 msgid "DNS Acceleration Mode"
 msgstr "解析加速模式"

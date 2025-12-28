@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-warpengine
 PKG_VERSION:=2025.12.28
-PKG_RELEASE:=3
+PKG_RELEASE:=4
 
 LUCI_TITLE:=LuCI support for WarpEngine (Ultra Edition)
 LUCI_DEPENDS:=+warpengine +luci-base +luci-compat
