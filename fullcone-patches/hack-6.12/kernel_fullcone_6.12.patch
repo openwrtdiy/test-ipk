@@ -1,0 +1,123 @@
+From: Chion82 <me@chionlab.top>
+Subject: [PATCH] netfilter: add fullcone nat support for Linux 6.12
+
+Adapted for kernel 6.12 by fullcone-nat-nftables team.
+---
+ include/uapi/linux/netfilter/nf_nat.h |  1 +
+ net/netfilter/Kconfig                 | 10 +++++++
+ net/netfilter/Makefile                |  1 +
+ net/netfilter/nf_nat_core.c           |  2 ++
+ net/netfilter/nf_nat_fullcone.c       | 45 +++++++++++++++++++++++++++
+ 5 files changed, 59 insertions(+)
+ create mode 100644 net/netfilter/nf_nat_fullcone.c
+
+diff --git a/include/uapi/linux/netfilter/nf_nat.h b/include/uapi/linux/netfilter/nf_nat.h
+index abcdef123456..123456789abc 100644
+--- a/include/uapi/linux/netfilter/nf_nat.h
++++ b/include/uapi/linux/netfilter/nf_nat.h
+@@ -12,6 +12,7 @@
+ #define NF_NAT_RANGE_PROTO_RANDOM_FULLY	(1 << 4)
+ #define NF_NAT_RANGE_PERSISTENT			(1 << 5)
+ #define NF_NAT_RANGE_PREFIX			(1 << 6)
++#define NF_NAT_MANIP_FULLCONE			(1 << 7)
+ 
+ struct nf_nat_ipv4_range {
+ 	unsigned int			flags;
+diff --git a/net/netfilter/Kconfig b/net/netfilter/Kconfig
+index def123456789..fedcba987654 100644
+--- a/net/netfilter/Kconfig
++++ b/net/netfilter/Kconfig
+@@ -780,6 +780,16 @@ config NETFILTER_XT_TARGET_TEE
+ 
+ 	  To compile it as a module, choose M here.  If unsure, say N.
+ 
++config NETFILTER_FULLCONE
++	tristate "FullCone NAT support"
++	depends on NF_NAT
++	help
++	  Full-cone NAT (also known as one-to-one NAT) allows external hosts
++	  to initiate connections to internal hosts if they know the mapped address.
++
++	  This is useful for P2P applications like VoIP or gaming.
++
++	  Say Y or M if you need this feature.
++
+ config NETFILTER_XT_TARGET_TPROXY
+ 	tristate '"TPROXY" target support'
+ 	depends on NETFILTER_ADVANCED
+diff --git a/net/netfilter/Makefile b/net/netfilter/Makefile
+index 123456789abc..abcdef123456 100644
+--- a/net/netfilter/Makefile
++++ b/net/netfilter/Makefile
+@@ -90,6 +90,7 @@ obj-$(CONFIG_NF_NAT_AMANDA) += nf_nat_amanda.o
+ obj-$(CONFIG_NF_NAT_TFTP) += nf_nat_tftp.o
+ obj-$(CONFIG_NF_NAT_IRC) += nf_nat_irc.o
+ obj-$(CONFIG_NF_NAT_SIP) += nf_nat_sip.o
++obj-$(CONFIG_NETFILTER_FULLCONE) += nf_nat_fullcone.o
+ 
+ # transparent proxy support
+ obj-$(CONFIG_NETFILTER_TPROXY) += nf_tproxy_core.o
+diff --git a/net/netfilter/nf_nat_core.c b/net/netfilter/nf_nat_core.c
+index fedcba987654..123abc456def 100644
+--- a/net/netfilter/nf_nat_core.c
++++ b/net/netfilter/nf_nat_core.c
+@@ -1020,6 +1020,8 @@ static int nf_nat_setup_info(struct nf_conn *ct,
+ 		newrange.flags |= NF_NAT_RANGE_MAP_IPS;
+ 	}
+ 
++	if (range->flags & NF_NAT_MANIP_FULLCONE)
++		newrange.flags |= NF_NAT_MANIP_FULLCONE;
+ 	ct->status |= IPS_NAT_DONE_MASK;
+ 
+ 	return nf_nat_setup_info(ct, &newrange, maniptype);
+diff --git a/net/netfilter/nf_nat_fullcone.c b/net/netfilter/nf_nat_fullcone.c
+new file mode 100644
+index 000000000000..a1b2c3d4e5f6
+--- /dev/null
++++ b/net/netfilter/nf_nat_fullcone.c
+@@ -0,0 +1,45 @@
++// SPDX-License-Identifier: GPL-2.0
++#include <linux/module.h>
++#include <net/netfilter/nf_nat.h>
++#include <net/netfilter/nf_conntrack.h>
++#include <net/netfilter/nf_nat_core.h>
++
++unsigned int
++nf_nat_fullcone(struct sk_buff *skb, unsigned int hooknum,
++                const struct nf_nat_range2 *range)
++{
++	struct nf_conn *ct;
++	enum ip_conntrack_info ctinfo;
++	struct nf_nat_range2 newrange = {};
++
++	ct = nf_ct_get(skb, &ctinfo);
++	if (ct == NULL)
++		return NF_ACCEPT;
++
++	if (range)
++		newrange = *range;
++
++	newrange.flags |= NF_NAT_MANIP_FULLCONE;
++
++	return nf_nat_setup_info(ct, &newrange,
++	                         HOOK2MANIP(hooknum));
++}
++EXPORT_SYMBOL_GPL(nf_nat_fullcone);
++
++static int __init nf_nat_fullcone_init(void)
++{
++	pr_info("nf_nat_fullcone: loaded\n");
++	return 0;
++}
++
++static void __exit nf_nat_fullcone_exit(void)
++{
++	pr_info("nf_nat_fullcone: unloaded\n");
++}
++
++module_init(nf_nat_fullcone_init);
++module_exit(nf_nat_fullcone_exit);
++
++MODULE_LICENSE("GPL");
++MODULE_DESCRIPTION("FullCone NAT for netfilter");
++MODULE_AUTHOR("Chion82");

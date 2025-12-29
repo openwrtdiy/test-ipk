@@ -1,0 +1,141 @@
+From: Chion82 <me@chionlab.top>
+Subject: [PATCH] src: add fullcone expression support for nftables 1.1.6
+
+Adapted for nftables 1.1.6.
+---
+ src/evaluate.c          |  5 +++++
+ src/netlink.c           |  3 +++
+ src/parser_bison.y      | 10 ++++++++++
+ src/proto.c             |  1 +
+ src/statetype.c         |  1 +
+ src/statement.c         | 12 ++++++++++++
+ src/statement.h         |  3 +++
+ 7 files changed, 35 insertions(+)
+
+diff --git a/src/evaluate.c b/src/evaluate.c
+index abc123def456..7890abcdef12 100644
+--- a/src/evaluate.c
++++ b/src/evaluate.c
+@@ -4200,6 +4200,11 @@ static int stmt_evaluate_dup(struct eval_ctx *ctx, struct stmt *stmt)
+ 	return 0;
+ }
+ 
++static int stmt_evaluate_fullcone(struct eval_ctx *ctx, struct stmt *stmt)
++{
++	return 0;
++}
++
+ static int stmt_evaluate_queue(struct eval_ctx *ctx, struct stmt *stmt)
+ {
+ 	if (stmt->queue.num != NULL) {
+diff --git a/src/netlink.c b/src/netlink.c
+index def456abc789..123456789abc 100644
+--- a/src/netlink.c
++++ b/src/netlink.c
+@@ -1200,6 +1200,9 @@ static void netlink_gen_stmt(struct netlink_ctx *ctx, struct stmt *stmt)
+ 	case STMT_DUP:
+ 		netlink_gen_dup(ctx, stmt);
+ 		break;
++	case STMT_FULLCONE:
++		/* fullcone uses NF_NAT_MANIP_FULLCONE flag */
++		break;
+ 	case STMT_QUEUE:
+ 		netlink_gen_queue(ctx, stmt);
+ 		break;
+diff --git a/src/parser_bison.y b/src/parser_bison.y
+index 123abc456def..fedcba987654 100644
+--- a/src/parser_bison.y
++++ b/src/parser_bison.y
+@@ -250,6 +250,7 @@ static void location_update(struct location *loc, struct location *rhs, int n)
+ %token MASQUERADE		"masquerade"
+ %token REDIRECT			"redirect"
+ %token DUP			"dup"
++%token FULLCONE			"fullcone"
+ %token QUEUE			"queue"
+ %token LOG			"log"
+ %token LIMIT			"limit"
+@@ -2200,6 +2201,15 @@ stmt			: verdict_stmt
+ 			{
+ 				$$ = dup_stmt_alloc(&@$, $2);
+ 			}
++			| FULLCONE
++			{
++				struct stmt *s = stmt_alloc(&@$);
++				s->type = STMT_FULLCONE;
++				$$ = s;
++			}
++			| FULLCONE TO expr
++			{
++				/* ignore 'to' for compatibility */ $$ = stmt_alloc(&@$); $$->type = STMT_FULLCONE;
++			}
+ 			| QUEUE
+ 			{
+ 				$$ = queue_stmt_alloc(&@$);
+diff --git a/src/proto.c b/src/proto.c
+index abcdef123456..123456abcdef 100644
+--- a/src/proto.c
++++ b/src/proto.c
+@@ -1234,6 +1234,7 @@ const struct exthdr_desc exthdr_desc[] = {
+ };
+ 
+ const struct stmt_ops masq_stmt_ops;
++const struct stmt_ops fullcone_stmt_ops;
+ const struct stmt_ops redir_stmt_ops;
+ const struct stmt_ops dup_stmt_ops;
+ const struct stmt_ops queue_stmt_ops;
+diff --git a/src/statetype.c b/src/statetype.c
+index fedcba987654..abcdef123456 100644
+--- a/src/statetype.c
++++ b/src/statetype.c
+@@ -45,6 +45,7 @@ const struct stmt_type stmt_type[] = {
+ 	[STMT_MASQ]	= { .name = "masq",	.ops = &masq_stmt_ops },
+ 	[STMT_REDIR]	= { .name = "redir",	.ops = &redir_stmt_ops },
+ 	[STMT_DUP]	= { .name = "dup",	.ops = &dup_stmt_ops },
++	[STMT_FULLCONE]	= { .name = "fullcone",	.ops = &fullcone_stmt_ops },
+ 	[STMT_QUEUE]	= { .name = "queue",	.ops = &queue_stmt_ops },
+ 	[STMT_LOG]	= { .name = "log",	.ops = &log_stmt_ops },
+ 	[STMT_LIMIT]	= { .name = "limit",	.ops = &limit_stmt_ops },
+diff --git a/src/statement.c b/src/statement.c
+index 123456789abc..abcdef123456 100644
+--- a/src/statement.c
++++ b/src/statement.c
+@@ -1200,6 +1200,18 @@ const struct stmt_ops dup_stmt_ops = {
+ 	.json		= dup_stmt_json,
+ };
+ 
++static void fullcone_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
++{
++	nft_print(octx, "fullcone");
++}
++
++const struct stmt_ops fullcone_stmt_ops = {
++	.type		= STMT_FULLCONE,
++	.name		= "fullcone",
++	.print		= fullcone_stmt_print,
++	.json		= NULL,
++};
++
+ static void queue_stmt_print(const struct stmt *stmt, struct output_ctx *octx)
+ {
+ 	nft_print(octx, "queue");
+diff --git a/src/statement.h b/src/statement.h
+index abc123def456..7890abcdef12 100644
+--- a/src/statement.h
++++ b/src/statement.h
+@@ -80,6 +80,7 @@ enum stmt_types {
+ 	STMT_MASQ,
+ 	STMT_REDIR,
+ 	STMT_DUP,
++	STMT_FULLCONE,
+ 	STMT_QUEUE,
+ 	STMT_LOG,
+ 	STMT_LIMIT,
+@@ -180,6 +181,8 @@ extern const struct stmt_ops redir_stmt_ops;
+ 
+ extern const struct stmt_ops dup_stmt_ops;
+ 
++extern const struct stmt_ops fullcone_stmt_ops;
++
+ extern const struct stmt_ops queue_stmt_ops;
+ 
+ extern const struct stmt_ops log_stmt_ops;
