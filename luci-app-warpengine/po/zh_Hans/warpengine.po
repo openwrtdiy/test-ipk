@@ -1,97 +1,140 @@
 msgid ""
-msgstr "Content-Type: text/plain; charset=UTF-8"
+msgstr "Content-Type: text/plain; charset=UTF-8\n"
+
 msgid "WarpEngine Ultra Edition"
 msgstr "WarpEngine 曲速引擎"
-msgid "Full-stack network acceleration solution designed for OpenWrt 24.10."
+
+msgid "Full-stack network acceleration solution designed for OpenWrt 24.10 (nftables/fw4)."
 msgstr "专为 OpenWrt 24.10 (nftables/fw4) 设计的全栈网络高速转发方案。"
+
 msgid "Real-time Monitor"
 msgstr "实时状态监控"
+
 msgid "Active Flows"
 msgstr "活跃加速连接数"
+
 msgid "Hardware PPE Status"
 msgstr "硬件 PPE 状态"
+
 msgid "Detected"
 msgstr "已检测到"
+
 msgid "Not Detected"
 msgstr "未检测到"
+
 msgid "Active"
 msgstr "运行中"
+
 msgid "Disabled"
 msgstr "已禁用"
+
 msgid "Core Engine Settings"
 msgstr "核心引擎设置"
+
 msgid "Enable WarpEngine"
 msgstr "启用总开关"
+
 msgid "Firewall Settings"
 msgstr "防火墙设置"
+
 msgid "Software Flow Offloading"
 msgstr "软件加速 (Flow Offloading)"
+
 msgid "Hardware Flow Offloading"
 msgstr "硬件加速 (HW PPE)"
+
 msgid "Extreme low CPU usage (requires hardware support)"
 msgstr "极大降低 CPU 占用（需硬件 PPE/TSO 支持）"
+
 msgid "IPv6 Full-stack Acceleration"
 msgstr "IPv6 全栈加速"
+
 msgid "Advanced Optimization"
 msgstr "网络设置"
+
 msgid "TCP MSS Clamping"
 msgstr "MSS 自动钳制"
+
 msgid "Optimize PPPoE MTU adaptation"
 msgstr "自动修复 PPPoE 拨号环境下的 MTU 路径问题"
+
 msgid "Game Forwarding Priority (CAKE)"
 msgstr "游戏转发优先级 (CAKE)"
+
 msgid "Reduce jitter for online gaming"
 msgstr "利用 CAKE 算法优化小包转发，显著降低联机抖动"
+
 msgid "FullCone NAT"
 msgstr "全锥型 NAT (FullCone)"
+
 msgid "TCP BBR Algorithm"
 msgstr "TCP BBR 拥塞控制"
+
 msgid "Smart DNS Acceleration"
 msgstr "智能 DNS 加速"
+
 msgid "Enable DNS Acceleration"
 msgstr "开启 DNS 加速"
+
 msgid "DNS Acceleration Mode"
 msgstr "解析加速模式"
+
 msgid "Static"
 msgstr "手动指定"
+
 msgid "Auto (Benchmarking)"
 msgstr "自动优选 (延迟测速)"
+
 msgid "DNS Server Address"
 msgstr "上游 DNS 地址"
+
 msgid "mwan3 Compatibility Mode"
 msgstr "mwan3 兼容模式"
+
 msgid "Optimize nftables priority for mwan3 policy routing"
 msgstr "优化 nftables 优先级以兼容 mwan3 策略路由"
+
 msgid "Acceleration Exclusion List"
 msgstr "加速排除列表"
+
 msgid "Source IPs or ports to exclude from acceleration (e.g., VPN traffic)"
 msgstr "指定源 IP 或端口不走加速（例如：VPN 流量）"
+
 msgid "Kernel Version"
 msgstr "内核版本"
+
 msgid "Master Switch"
 msgstr "总控开关"
+
 msgid "Software Acceleration"
 msgstr "软件加速"
+
 msgid "Hardware Acceleration"
 msgstr "硬件加速"
+
 msgid "Full-stack Acceleration"
 msgstr "全栈加速"
+
 msgid "Game Priority (CAKE)"
 msgstr "游戏优先级 (CAKE)"
+
 msgid "Enabled"
 msgstr "已启用"
+
 msgid "Not Supported"
 msgstr "驱动不支持"
-# 新增功能翻译
+
 msgid "Packet Steering"
 msgstr "数据包导向"
-msgid "Optimizes multi-core data packet processing efficiency. Requires a multi-core CPU."
+
+msgid "Optimizes multi-core data packet processing efficiency. Requires multi-core CPU."
 msgstr "优化多核数据包处理效率。需要多核 CPU。"
+
 msgid "IRQ Balance"
 msgstr "IRQ 平衡"
+
 msgid "Distributes network interrupt requests (IRQ) evenly across all CPU cores. Requires irqbalance package."
 msgstr "将网络中断请求（IRQ）均匀分配到所有 CPU 核心。需要 irqbalance 软件包。"
-# 新增的“多核设置”翻译项
+
 msgid "多核设置"
 msgstr "多核设置"
-

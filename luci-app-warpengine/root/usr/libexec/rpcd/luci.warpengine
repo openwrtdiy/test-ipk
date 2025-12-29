@@ -1,33 +1,43 @@
 #!/bin/sh
 case "$1" in
-list) echo '{ "get_status": {} }' ;;
-call)
- case "$2" in
- get_status)
- kernel=$(uname -r)
- # 1. 总控开关状态 (读取配置文件)
- [ "$(uci -q get warpengine.main.enabled)" = "1" ] && master="Active" || master="Disabled"
- # 2. 获取防火墙组真实值
- sw_s=$([ "$(uci -q get firewall.@defaults[-1].flow_offloading)" = "1" ] && echo "Active" || echo "Disabled")
- v6_s=$([ "$(uci -q get firewall.@defaults[-1].flow_offloading_6)" = "1" ] && echo "Active" || echo "Disabled")
- fc_s=$([ "$(uci -q get firewall.@defaults[-1].fullcone)" = "1" ] && echo "Active" || echo "Disabled")
- # 3. 硬件加速逻辑: 检查/sys/kernel/debug/ppe路径判断是否激活
- hw_on=$(uci -q get firewall.@defaults[-1].hw_flow_offloading)
- if [ "$hw_on" = "1" ] && [ -d "/sys/kernel/debug/ppe" ]; then hw_s="Active"
- elif [ "$hw_on" = "1" ]; then hw_s="Inactive"; else hw_s="Disabled"; fi
- # 4. 其他节点 (BBR, CAKE, DNS, Packet Steering, IRQ Balance)
- bbr_s=$([ "$(sysctl -n net.ipv4.tcp_congestion_control 2>/dev/null | grep -c 'bbr')" = "1" ] && echo "Active" || echo "Disabled")
- lan_if=$(uci -q get network.lan.device || echo "br-lan")
- cake_s=$([ "$(tc qdisc show dev $lan_if 2>/dev/null | grep -c 'cake')" = "1" ] && echo "Active" || echo "Disabled")
- dns_s=$([ "$(uci -q get dhcp.@dnsmasq.noresolv)" = "1" ] && echo "Active" || echo "Disabled")
- # 新增功能状态检查: Packet Steering (检查 network.globals 配置)
- ps_s=$([ "$(uci -q get network.globals.packet_steering)" = "1" ] && echo "Active" || echo "Disabled")
- # 新增功能状态检查: IRQ Balance (检查 warpengine.main 配置, 假设服务随配置启停)
- irqb_s=$([ "$(uci -q get warpengine.main.irq_balance)" = "1" ] && echo "Active" || echo "Disabled")
- count=$(nft list flowtable inet fw4 ft 2>/dev/null | grep -c "packets" || echo 0)
- # 更新 printf 格式字符串以包含新的状态
- printf '{ "kernel": "%s", "flow_count": %d, "hw_status": "%s", "engine_enabled": "%s", "sw_status": "%s", "v6_status": "%s", "fullcone_status": "%s", "bbr_status": "%s", "cake_status": "%s", "dns_acc_status": "%s", "ps_status": "%s", "irqb_status": "%s" }\n' \
- "$kernel" "$count" "$hw_s" "$master" "$sw_s" "$v6_s" "$fc_s" "$bbr_s" "$cake_s" "$dns_s" "$ps_s" "$irqb_s"
- ;;
- esac
-
+	list) echo '{ "get_status": {} }' ;;
+	call)
+		case "$2" in
+			get_status)
+				kernel=$(uname -r 2>/dev/null || echo "unknown")
+				[ "$(uci -q get warpengine.main.enabled)" = "1" ] && engine_enabled="Active" || engine_enabled="Disabled"
+				[ "$(uci -q get firewall.@defaults[-1].flow_offloading)" = "1" ] && sw_status="Active" || sw_status="Disabled"
+				[ "$(uci -q get firewall.@defaults[-1].flow_offloading_6)" = "1" ] && v6_status="Active" || v6_status="Disabled"
+				[ "$(uci -q get firewall.@defaults[-1].fullcone)" = "1" ] && fullcone_status="Active" || fullcone_status="Disabled"
+				hw_on=$(uci -q get firewall.@defaults[-1].hw_flow_offloading)
+				if [ "$hw_on" = "1" ] && [ -d "/sys/kernel/debug/ppe" ]; then hw_status="Active"
+				elif [ "$hw_on" = "1" ]; then hw_status="Inactive"
+				else hw_status="Disabled"; fi
+				bbr_algo=$(sysctl -n net.ipv4.tcp_congestion_control 2>/dev/null)
+				[ "$bbr_algo" = "bbr" ] && bbr_status="Active" || bbr_status="Disabled"
+				lan_if=$(uci -q get network.lan.device || echo "br-lan")
+				if tc qdisc show dev "$lan_if" 2>/dev/null | grep -q cake; then cake_status="Active"
+				else cake_status="Disabled"; fi
+				[ "$(uci -q get dhcp.@dnsmasq.noresolv)" = "1" ] && dns_acc_status="Active" || dns_acc_status="Disabled"
+				[ "$(uci -q get network.globals.packet_steering)" = "1" ] && ps_status="Active" || ps_status="Disabled"
+				[ "$(uci -q get warpengine.main.irq_balance)" = "1" ] && irqb_status="Active" || irqb_status="Disabled"
+				count=$(nft list flowtable inet fw4 ft 2>/dev/null | grep -c "packets" || echo 0)
+				printf '{
+					"kernel": "%s",
+					"flow_count": %d,
+					"hw_status": "%s",
+					"engine_enabled": "%s",
+					"sw_status": "%s",
+					"v6_status": "%s",
+					"fullcone_status": "%s",
+					"bbr_status": "%s",
+					"cake_status": "%s",
+					"dns_acc_status": "%s",
+					"ps_status": "%s",
+					"irqb_status": "%s"
+				}' "$kernel" "$count" "$hw_status" "$engine_enabled" "$sw_status" "$v6_status" \
+				   "$fullcone_status" "$bbr_status" "$cake_status" "$dns_acc_status" "$ps_status" "$irqb_status"
+				;;
+		esac
+		;;
+esac

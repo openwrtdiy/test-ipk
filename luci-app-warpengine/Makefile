@@ -1,33 +1,60 @@
+# SPDX-License-Identifier: GPL-2.0-only
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-warpengine
-PKG_VERSION:=2025.12.29
-PKG_RELEASE:=5
+PKG_VERSION:=2025.12.30
+PKG_RELEASE:=6
 
-PKG_LICENSE:=GPL-3.0
+PKG_LICENSE:=GPL-2.0
 PKG_MAINTAINER:=Your Name <your.email@example.com>
 
-LUCI_TITLE:=LuCI support for WarpEngine (Ultra Edition)
-LUCI_DEPENDS:=+warpengine +luci-base +luci-compat
-LUCI_PKGARCH:=all
+include $(INCLUDE_DIR)/package.mk
 
-include $(TOPDIR)/feeds/luci/luci.mk
+define Package/luci-app-warpengine
+  SECTION:=luci
+  CATEGORY:=LuCI
+  SUBMENU:=3. Applications
+  TITLE:=WARP Engine - LuCI (JS-based)
+  DEPENDS:=+warpengine +luci-base
+  PKGARCH:=all
+endef
 
-# 关键修正：显式定义安装后的权限处理逻辑
-# 注意：一定要放在 include luci.mk 之后，并确保没有冲突
-define Package/$(PKG_NAME)/postinst
+define Package/luci-app-warpengine/description
+  Modern LuCI interface for WARP Engine using JavaScript.
+endef
+
+define Package/luci-app-warpengine/postinst
 #!/bin/sh
 if [ -z "$${IPKG_INSTROOT}" ]; then
-	# 赋予后端脚本执行权限（解决 RPC 报错的核心）
 	[ -f /usr/libexec/rpcd/luci.warpengine ] && chmod 0755 /usr/libexec/rpcd/luci.warpengine
-	# 重启 rpcd 以应用 ACL 权限和新脚本
 	/etc/init.d/rpcd restart
-	# 清理 LuCI 缓存
-	rm -rf /tmp/luci-indexcache /tmp/luci-modulecache
+	rm -rf /tmp/luci-indexcache /tmp/luci-modulecache 2>/dev/null || true
 fi
 exit 0
 endef
 
-# 注意：正如你所发现的，这里【绝对不要】再写 $(eval $(call BuildPackage,...))
-# 因为 luci.mk 内部已经帮你调用过了。
+define Package/luci-app-warpengine/install
+	$(INSTALL_DIR) $(1)/www/luci-static/resources/view/warpengine
+	$(INSTALL_DATA) ./htdocs/luci-static/resources/view/warpengine/warpengine.js $(1)/www/luci-static/resources/view/warpengine/
 
+	$(INSTALL_DIR) $(1)/usr/libexec/rpcd
+	$(INSTALL_BIN) ./root/usr/libexec/rpcd/luci.warpengine $(1)/usr/libexec/rpcd/
+
+	$(INSTALL_DIR) $(1)/usr/share/luci/menu.d
+	$(INSTALL_DATA) ./root/usr/share/luci/menu.d/luci-app-warpengine.json $(1)/usr/share/luci/menu.d/
+
+	$(INSTALL_DIR) $(1)/usr/share/rpcd/acl.d
+	$(INSTALL_DATA) ./root/usr/share/rpcd/acl.d/luci-app-warpengine.json $(1)/usr/share/rpcd/acl.d/
+
+	$(INSTALL_DIR) $(1)/usr/share/ucitrack
+	$(INSTALL_DATA) ./root/usr/share/ucitrack/luci-app-warpengine.json $(1)/usr/share/ucitrack/
+
+	$(INSTALL_DIR) $(1)/www/luci-static/resources/i18n/zh_Hans
+	$(INSTALL_DATA) ./po/zh_Hans/warpengine.po $(1)/www/luci-static/resources/i18n/zh_Hans/
+endef
+
+define Build/Compile
+	# No compilation needed for JS apps
+endef
+
+$(eval $(call BuildPackage,luci-app-warpengine))
