@@ -1,9 +1,0 @@
-{
-  "turboacc": {
-    "init": "turboacc",
-    "affects": [
-      "network",
-      "firewall"
-    ]
-  }
-}
